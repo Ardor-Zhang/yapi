@@ -16523,10 +16523,10 @@ yallist@^4.0.0:
   resolved "https://registry.yarnpkg.com/yallist/-/yallist-4.0.0.tgz#9bb92790d9c0effec63be73519e11a35019a3a72"
   integrity sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==
 
-yapi-json-to-interface@^0.0.7:
-  version "0.0.7"
-  resolved "https://registry.yarnpkg.com/yapi-json-to-interface/-/yapi-json-to-interface-0.0.7.tgz#60ce73bb7082f3b16e97b63bd2c5ee18cdfe5bd7"
-  integrity sha512-CJIq2QzlpisAegv4quG3sXOB1zH+En530l3tiFTZwivn8RjrpTsz7DllVp41saX/6SXjnku8IIisgPYffyI3Uw==
+yapi-json-to-interface@^0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/yapi-json-to-interface/-/yapi-json-to-interface-0.1.1.tgz#c0c152becb1241d9fc8d59fb2e0b54e7d84121a5"
+  integrity sha512-l+Mq35eZmFrL7Hw7vvjCJ02l1g+L8NCf5yFGHSqISmpbJy10/1P5rBjwaFxRhEsaCBgi4bI/nDdT6g0hHX/Cdg==
   dependencies:
     "@babel/runtime" "^7.7.2"
 

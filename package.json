@@ -87,7 +87,7 @@
     "underscore": "1.8.3",
     "url": "0.11.0",
     "vm2": "^3.8.4",
-    "yapi-json-to-interface": "^0.0.8",
+    "yapi-json-to-interface": "^0.1.1",
     "yapi-plugin-qsso": "^1.1.0"
   },
   "devDependencies": {

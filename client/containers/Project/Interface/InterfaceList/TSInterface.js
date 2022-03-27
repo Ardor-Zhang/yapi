@@ -2,18 +2,16 @@ import './View.scss';
 import React, { PureComponent as Component } from 'react';
 import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
-import { Table, Icon, message } from 'antd';
-import CodeMirrorWithCopy from 'client/components/CodeMirrorWithCopy/CodeMirrorWithCopy';
 import ErrMsg from '../../../../components/ErrMsg/ErrMsg.js';
 import constants from '../../../../constants/variable.js';
-import copy from 'copy-to-clipboard';
+
+const HTTP_METHOD = constants.HTTP_METHOD;
 
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript.js';
-import { transform, transformQuery } from "yapi-json-to-interface";
-
-const HTTP_METHOD = constants.HTTP_METHOD;
+import { transformSchema, transformForm, transformRaw } from "yapi-json-to-interface";
+import CodeMirrorWithCopy from 'client/components/CodeMirrorWithCopy/CodeMirrorWithCopy';
 
 @connect(state => {
   return {
@@ -27,7 +25,7 @@ class TSInterface extends Component {
     super(props);
     this.state = {
       init: true,
-      enter: false,
+      enter: false
     };
   }
   static propTypes = {
@@ -44,106 +42,59 @@ class TSInterface extends Component {
 
   req_body_form(req_body_type, req_body_form) {
     if (req_body_type === 'form') {
-      const columns = [
-        {
-          title: '参数名称',
-          dataIndex: 'name',
-          key: 'name',
-          width: 140
-        },
-        {
-          title: '参数类型',
-          dataIndex: 'type',
-          key: 'type',
-          width: 100,
-          render: text => {
-            text = text || '';
-            return text.toLowerCase() === 'text' ? (
-              <span>
-                <i className="query-icon text">T</i>文本
-              </span>
-            ) : (
-              <span>
-                <Icon type="file" className="query-icon" />文件
-              </span>
-            );
-          }
-        },
-        {
-          title: '是否必须',
-          dataIndex: 'required',
-          key: 'required',
-          width: 100
-        },
-        {
-          title: '示例',
-          dataIndex: 'example',
-          key: 'example',
-          width: 80,
-          render(_, item) {
-            return <p style={{ whiteSpace: 'pre-wrap' }}>{item.example}</p>;
-          }
-        },
-        {
-          title: '备注',
-          dataIndex: 'value',
-          key: 'value',
-          render(_, item) {
-            return <p style={{ whiteSpace: 'pre-wrap' }}>{item.value}</p>;
-          }
-        }
-      ];
-
-      const dataSource = [];
-      if (req_body_form && req_body_form.length) {
-        req_body_form.map((item, i) => {
-          dataSource.push({
-            key: i,
-            name: item.name,
-            value: item.desc,
-            example: item.example,
-            required: item.required == 0 ? '否' : '是',
-            type: item.type
-          });
-        });
-      }
-
       return (
-        <div style={{ display: dataSource.length ? '' : 'none' }} className="colBody">
-          <Table
-            bordered
-            size="small"
-            pagination={false}
-            columns={columns}
-            dataSource={dataSource}
+        req_body_form 
+        && req_body_form.length 
+        && <CodeMirrorWithCopy
+        value={transformForm(req_body_form, 'ReqBody')}
+        options={this.options}
+      />
+      );
+    }
+  }
+
+  res_body(res_body_type, res_body, res_body_is_json_schema) {
+    if (res_body_type === 'json') {
+      return <CodeMirrorWithCopy
+        value={transformSchema(JSON.parse(res_body), 'ResBody')}
+        options={this.options}
+      />
+    } else if (res_body_type === 'raw') {
+      return (
+        <div className="colBody">
+          <CodeMirrorWithCopy
+            value={transformRaw(JSON.parse(res_body), 'ResBody')}
+            options={this.options}
           />
         </div>
       );
     }
   }
 
-  res_body(res_body_type, res_body = '{}', res_body_is_json_schema) {
-    return (
-      <div className='for-margin'>
-        <CodeMirrorWithCopy
-          value={transform(JSON.parse(res_body), 'ResBody')}
+  req_body(req_body_type, req_body_other, req_body_is_json_schema) {
+    if (req_body_other) {
+      if (req_body_is_json_schema && req_body_type === 'json') {
+        return <CodeMirrorWithCopy
+          value={transformSchema(JSON.parse(req_body_other), 'ReqBody')}
           options={this.options}
-        />
-      </div>
-    )
-  }
-
-  req_body(req_body_type, req_body_other = '{}', req_body_is_json_schema) {
-    return <CodeMirrorWithCopy
-      value={transform(JSON.parse(req_body_other), 'ReqBody')}
-      options={this.options}
-    />
+        />;
+      } else {
+        return (
+          <div className="colBody">
+            <CodeMirrorWithCopy
+              value={transformRaw(JSON.parse(req_body_other), 'ReqBody')}
+              options={this.options}
+            />
+          </div>
+        );
+      }
+    }
   }
 
   req_query(query) {
     return (
       <CodeMirrorWithCopy
-        value={transformQuery(query, 'ReqQuery')}
+        value={transformForm(query, 'ReqBody')}
         options={this.options}
       />
     );
@@ -155,10 +106,6 @@ class TSInterface extends Component {
     }
   }
 
-  copyUrl = url => {
-    copy(url);
-    message.success('已经成功复制到剪切板');
-  };
 
   render() {
     const req_dataSource = [];
@@ -186,13 +133,11 @@ class TSInterface extends Component {
 
     let res = (
       <div className="caseContainer">
-        <h2 
-          className="interface-title"
-          style={{ display: requestShow ? '' : 'none', marginTop: 0 }}
-        >
-          请求参数
-        </h2>
-
+        {
+          requestShow && <h2 className="interface-title">
+            请求参数
+          </h2>
+        }
         {this.props.curData.req_query && this.props.curData.req_query.length ? (
           <div className="colQuery">
             <h3 className="col-title">Query：</h3>
@@ -244,4 +189,3 @@ class TSInterface extends Component {
 }
 
 export default TSInterface;
-
