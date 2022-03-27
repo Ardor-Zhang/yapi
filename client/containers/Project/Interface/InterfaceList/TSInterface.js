@@ -3,9 +3,6 @@ import React, { PureComponent as Component } from 'react';
 import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
 import ErrMsg from '../../../../components/ErrMsg/ErrMsg.js';
-import constants from '../../../../constants/variable.js';
-
-const HTTP_METHOD = constants.HTTP_METHOD;
 
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
@@ -43,27 +40,36 @@ class TSInterface extends Component {
   req_body_form(req_body_type, req_body_form) {
     if (req_body_type === 'form') {
       return (
-        req_body_form 
-        && req_body_form.length 
+        req_body_form
+        && req_body_form.length
         && <CodeMirrorWithCopy
-        value={transformForm(req_body_form, 'ReqBody')}
-        options={this.options}
-      />
+          value={transformForm((req_body_form || []), 'ReqBody')}
+          options={this.options}
+        />
       );
     }
   }
 
   res_body(res_body_type, res_body, res_body_is_json_schema) {
     if (res_body_type === 'json') {
-      return <CodeMirrorWithCopy
-        value={transformSchema(JSON.parse(res_body), 'ResBody')}
-        options={this.options}
-      />
+
+      if (res_body_is_json_schema) {
+        return <CodeMirrorWithCopy
+          value={transformSchema(JSON.parse(res_body || '{}'), 'ResBody')}
+          options={this.options}
+        />
+      } else {
+        const raw = res_body ? eval('(' + res_body + ')') : {};
+        return <CodeMirrorWithCopy
+          value={transformRaw(raw, 'ResBody')}
+          options={this.options}
+        />
+      }
     } else if (res_body_type === 'raw') {
       return (
         <div className="colBody">
           <CodeMirrorWithCopy
-            value={transformRaw(JSON.parse(res_body), 'ResBody')}
+            value={transformRaw(JSON.parse(res_body || '{}'), 'ResBody')}
             options={this.options}
           />
         </div>
@@ -75,14 +81,14 @@ class TSInterface extends Component {
     if (req_body_other) {
       if (req_body_is_json_schema && req_body_type === 'json') {
         return <CodeMirrorWithCopy
-          value={transformSchema(JSON.parse(req_body_other), 'ReqBody')}
+          value={transformSchema(JSON.parse(req_body_other || '{}'), 'ReqBody')}
           options={this.options}
         />;
       } else {
         return (
           <div className="colBody">
             <CodeMirrorWithCopy
-              value={transformRaw(JSON.parse(req_body_other), 'ReqBody')}
+              value={transformRaw(JSON.parse(req_body_other || '{}'), 'ReqBody')}
               options={this.options}
             />
           </div>
@@ -94,7 +100,7 @@ class TSInterface extends Component {
   req_query(query) {
     return (
       <CodeMirrorWithCopy
-        value={transformForm(query, 'ReqBody')}
+        value={transformForm((query || []), 'ReqQuery')}
         options={this.options}
       />
     );
@@ -134,46 +140,55 @@ class TSInterface extends Component {
     let res = (
       <div className="caseContainer">
         {
-          requestShow && <h2 className="interface-title">
-            请求参数
-          </h2>
+          requestShow
+            ? <h2 className="interface-title">
+              请求参数
+            </h2>
+            : ''
         }
-        {this.props.curData.req_query && this.props.curData.req_query.length ? (
-          <div className="colQuery">
-            <h3 className="col-title">Query：</h3>
-            {this.req_query(this.props.curData.req_query)}
-          </div>
-        ) : (
-          ''
-        )}
 
-        <div
-          style={{
-            display:
-              this.props.curData.method &&
-                HTTP_METHOD[this.props.curData.method.toUpperCase()].request_body
-                ? ''
-                : 'none'
-          }}
-        >
-          <h3 style={{ display: bodyShow ? '' : 'none' }} className="col-title">
-            Body:
-          </h3>
-          {this.props.curData.req_body_type === 'form'
-            ? this.req_body_form(this.props.curData.req_body_type, this.props.curData.req_body_form)
-            : this.req_body(
-              this.props.curData.req_body_type,
-              this.props.curData.req_body_other,
-              this.props.curData.req_body_is_json_schema
-            )}
+        {
+          requestShow && this.props.curData.req_query && this.props.curData.req_query.length ? (
+            <div className="colQuery">
+              <h3 className="col-title">Query：</h3>
+              {this.req_query(this.props.curData.req_query)}
+            </div>
+          ) : ''
+        }
+
+        {
+          bodyShow
+            ? <h3 style={{ display: bodyShow ? '' : 'none' }} className="col-title">
+              Body:
+            </h3>
+            : ''
+        }
+
+        <div>
+          {
+            bodyShow
+              ? this.props.curData.req_body_type === 'form'
+                ? this.req_body_form(this.props.curData.req_body_type, this.props.curData.req_body_form)
+                : this.req_body(
+                  this.props.curData.req_body_type,
+                  this.props.curData.req_body_other,
+                  this.props.curData.req_body_is_json_schema
+                )
+              : ''
+          }
         </div>
 
         <h2 className="interface-title">返回数据</h2>
-        {this.res_body(
-          this.props.curData.res_body_type,
-          this.props.curData.res_body,
-          this.props.curData.res_body_is_json_schema
-        )}
+        <div>
+          {
+            this.res_body(
+              this.props.curData.res_body_type,
+              this.props.curData.res_body,
+              this.props.curData.res_body_is_json_schema
+            )
+          }
+        </div>
+
       </div>
     );
 
