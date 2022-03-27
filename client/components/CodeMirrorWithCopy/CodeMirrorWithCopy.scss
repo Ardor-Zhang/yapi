@@ -1,0 +1,10 @@
+.code-mirror-with-copy {
+  position: relative;
+
+  .copy-button {
+    position: absolute;
+    z-index: 100;
+    right: 6px;
+    top: 6px;
+  }
+}

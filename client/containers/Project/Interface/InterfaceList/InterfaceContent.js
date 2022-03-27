@@ -3,6 +3,7 @@ import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
 import { Tabs, Modal, Button } from 'antd';
 import Edit from './Edit.js';
+import TSInterface from './TSInterface.js';
 import View from './View.js';
 import { Prompt } from 'react-router';
 import { fetchInterfaceData } from '../../../../reducer/modules/interface.js';
@@ -119,6 +120,10 @@ class Content extends Component {
       edit: {
         component: Edit,
         name: '编辑'
+      },
+      ts: {
+        component: TSInterface,
+        name: 'TSInterface'
       },
       run: {
         component: Run,
