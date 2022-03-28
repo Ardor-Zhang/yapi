@@ -7,7 +7,7 @@ import ErrMsg from '../../../../components/ErrMsg/ErrMsg.js';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript.js';
-import { transformSchema, transformForm, transformRaw } from "yapi-json-to-interface";
+import { transformSchema, transformRaw, transformForm } from "yapi-json-to-interface";
 import CodeMirrorWithCopy from 'client/components/CodeMirrorWithCopy/CodeMirrorWithCopy';
 
 @connect(state => {
@@ -50,27 +50,51 @@ class TSInterface extends Component {
     }
   }
 
+  standardizeData(data, type) {
+    if (type === 'json') {
+      try {
+        return JSON.parse(data || '{}');
+      } catch (error) {
+        console.log(error);
+        return {}
+      }
+    } else if (type === 'raw') {
+      try {
+        return eval('(' + data + ')');
+      } catch (error) {
+        console.log(error);
+        return {}
+      }
+    } else {
+      return {}
+    }
+  }
+
   res_body(res_body_type, res_body, res_body_is_json_schema) {
     if (res_body_type === 'json') {
-
       if (res_body_is_json_schema) {
         return <CodeMirrorWithCopy
-          value={transformSchema(JSON.parse(res_body || '{}'), 'ResBody')}
+          value={ transformSchema(this.standardizeData(res_body, 'json'), 'ResBody') }
           options={this.options}
         />
       } else {
-        const raw = res_body ? eval('(' + res_body + ')') : {};
         return <CodeMirrorWithCopy
-          value={transformRaw(raw, 'ResBody')}
+          value={transformRaw(this.standardizeData(res_body, 'raw'), 'ResBody') }
           options={this.options}
         />
       }
     } else if (res_body_type === 'raw') {
+      let data = {};
+      if (res_body_is_json_schema) {
+        data = this.standardizeData(res_body, 'raw');
+      } else {
+        data = this.standardizeData(res_body, 'json');
+      };
       return (
         <div className="colBody">
           <CodeMirrorWithCopy
-            value={transformRaw(JSON.parse(res_body || '{}'), 'ResBody')}
-            options={this.options}
+            value={ transformRaw(data, 'ResBody') }
+            options={ this.options }
           />
         </div>
       );
@@ -81,15 +105,15 @@ class TSInterface extends Component {
     if (req_body_other) {
       if (req_body_is_json_schema && req_body_type === 'json') {
         return <CodeMirrorWithCopy
-          value={transformSchema(JSON.parse(req_body_other || '{}'), 'ReqBody')}
-          options={this.options}
+          value={ transformSchema(this.standardizeData(req_body_other, 'json'), 'ReqBody') }
+          options={ this.options }
         />;
       } else {
         return (
           <div className="colBody">
             <CodeMirrorWithCopy
-              value={transformRaw(JSON.parse(req_body_other || '{}'), 'ReqBody')}
-              options={this.options}
+              value={ transformRaw(this.standardizeData(req_body_other, 'raw'), 'ReqBody') }
+              options={ this.options }
             />
           </div>
         );
