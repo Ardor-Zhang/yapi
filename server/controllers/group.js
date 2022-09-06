@@ -6,7 +6,9 @@ const userModel = require('../models/user.js');
 const interfaceModel = require('../models/interface.js');
 const interfaceColModel = require('../models/interfaceCol.js');
 const interfaceCaseModel = require('../models/interfaceCase.js');
-const _ = require('underscore')
+const interfaceCatModel = require('../models/interfaceCat.js');
+
+const _ = require('underscore');
 
 const rolename = {
   owner: '组长',
@@ -127,17 +129,15 @@ class groupController extends baseController {
     let params = ctx.params;
 
     // 新版每个人都有权限添加分组
-    
+
     // if (this.getRole() !== 'admin') {
     //   return (ctx.body = yapi.commons.resReturn(null, 401, '没有权限'));
     // }
 
     let owners = [];
 
-    if(params.owner_uids.length === 0){
-      params.owner_uids.push(
-        this.getUid()
-      )
+    if (params.owner_uids.length === 0) {
+      params.owner_uids.push(this.getUid());
     }
 
     if (params.owner_uids) {
@@ -188,6 +188,104 @@ class groupController extends baseController {
     });
     ctx.body = yapi.commons.resReturn(result);
   }
+  /**
+   * 拷贝空间
+   * @interface /group/copy
+   * @method POST
+   */
+  async copy(ctx) {
+    try {
+      let params = ctx.params;
+
+      // 拷贝空间的ID
+      let copyId = params._id;
+      if ((await this.checkAuth(params.group_id, 'group', 'edit')) !== true) {
+        return (ctx.body = yapi.commons.resReturn(null, 405, '没有权限'));
+      }
+
+      let groupInst = yapi.getInst(groupModel);
+      let groupInfo = groupInst.getGroupById(copyId);
+      const copyProjectName = groupInfo.group_name + Date.now();
+      let checkRepeat = await groupInst.checkRepeat(copyProjectName);
+      if (checkRepeat > 0) {
+        return (ctx.body = yapi.commons.resReturn(null, 401, '项目分组名已存在'));
+      }
+      // 新增空间
+      let newGroupInfo = groupInst.save({
+        group_name: copyProjectName,
+        group_desc: groupInfo.group_desc,
+        uid: this.getUid(),
+        add_time: yapi.commons.time(),
+        up_time: yapi.commons.time(),
+        members: groupInfo.owners
+      });
+
+      //  获取 group 下的所有项目，然后全部复制
+      if (newGroupInfo._id) {
+        // 拷贝项目列表
+        let projectList = await yapi.getInst(projectModel).list(copyId);
+        for (let i = 0; i < projectList.length; i++) {
+          let data = Object.assign(projectList[i], {
+            uid: this.getUid(),
+            add_time: yapi.commons.time(),
+            up_time: yapi.commons.time()
+          });
+          delete data._id;
+          let copyProjectInfo = await yapi.getInst(projectModel).save(data);
+          let colInst = yapi.getInst(interfaceColModel);
+          let catInst = yapi.getInst(interfaceCatModel);
+          let interfaceModel = yapi.getInst(interfaceModel);
+
+          // 增加集合
+          if (copyProjectInfo._id) {
+            await colInst.save({
+              name: '公共测试集',
+              project_id: copyProjectInfo._id,
+              desc: '公共测试集',
+              uid: this.getUid(),
+              add_time: yapi.commons.time(),
+              up_time: yapi.commons.time()
+            });
+
+            // 拷贝接口列表
+            let cat = params.cat;
+            for (let j = 0; j < cat.length; j++) {
+              let item = cat[j];
+              let catDate = {
+                name: item.name,
+                project_id: copyProjectInfo._id,
+                desc: item.desc,
+                uid: this.getUid(),
+                add_time: yapi.commons.time(),
+                up_time: yapi.commons.time()
+              };
+              let catResult = await catInst.save(catDate);
+
+              // 获取每个集合中的interface
+              let interfaceData = await interfaceModel.listByInterStatus(item._id);
+
+              // 将interfaceData存到新的catID中
+              for (let key = 0; key < interfaceData.length; key++) {
+                let interfaceItem = interfaceData[key].toObject();
+                let data = Object.assign(interfaceItem, {
+                  uid: this.getUid(),
+                  catid: catResult._id,
+                  project_id: copyProjectInfo._id,
+                  add_time: yapi.commons.time(),
+                  up_time: yapi.commons.time()
+                });
+                delete data._id;
+
+                await interfaceModel.save(data);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      ctx.body = yapi.commons.resReturn(null, 402, err.message);
+    }
+  }
 
   /**
    * 获取用户数据
@@ -212,7 +310,7 @@ class groupController extends baseController {
     };
   }
 
-  async getMyGroup(ctx){
+  async getMyGroup(ctx) {
     var groupInst = yapi.getInst(groupModel);
     let privateGroup = await groupInst.getByPrivateUid(this.getUid());
     if (!privateGroup) {
@@ -224,10 +322,10 @@ class groupController extends baseController {
         type: 'private'
       });
     }
-    if(privateGroup){
-      ctx.body = yapi.commons.resReturn(privateGroup)
-    }else{
-      ctx.body = yapi.commons.resReturn(null)
+    if (privateGroup) {
+      ctx.body = yapi.commons.resReturn(privateGroup);
+    } else {
+      ctx.body = yapi.commons.resReturn(null);
     }
   }
 
@@ -415,40 +513,40 @@ class groupController extends baseController {
       });
     }
 
-    if(this.getRole() === 'admin'){
+    if (this.getRole() === 'admin') {
       let result = await groupInst.list();
-      if(result && result.length > 0 ){
-        for (let i = 0; i < result.length; i++){
+      if (result && result.length > 0) {
+        for (let i = 0; i < result.length; i++) {
           result[i] = result[i].toObject();
-          newResult.unshift(result[i])
+          newResult.unshift(result[i]);
         }
       }
-    }else{
+    } else {
       let result = await groupInst.getAuthList(this.getUid());
-      if(result && result.length > 0 ){
-        for (let i = 0; i < result.length; i++){
+      if (result && result.length > 0) {
+        for (let i = 0; i < result.length; i++) {
           result[i] = result[i].toObject();
-          newResult.unshift(result[i])
+          newResult.unshift(result[i]);
         }
       }
 
-      const groupIds = newResult.map(item=> item._id);
+      const groupIds = newResult.map(item => item._id);
       const newGroupIds = [];
 
       let groupByProject = await projectInst.getAuthList(this.getUid());
-      if(groupByProject && groupByProject.length > 0){
-        groupByProject.forEach( _data=>{
+      if (groupByProject && groupByProject.length > 0) {
+        groupByProject.forEach(_data => {
           const _temp = [...groupIds, ...newGroupIds];
-          if(!_.find(_temp, id=> id === _data.group_id)){
-            newGroupIds.push(_data.group_id)
+          if (!_.find(_temp, id => id === _data.group_id)) {
+            newGroupIds.push(_data.group_id);
           }
-        })
+        });
       }
-      let newData = await groupInst.findByGroups(newGroupIds)
-      newData.forEach(_data=>{
+      let newData = await groupInst.findByGroups(newGroupIds);
+      newData.forEach(_data => {
         _data = _data.toObject();
         newResult.push(_data);
-      })
+      });
     }
     if (privateGroup) {
       privateGroup = privateGroup.toObject();
