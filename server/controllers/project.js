@@ -12,7 +12,7 @@ const userModel = require('../models/user.js');
 const logModel = require('../models/log.js');
 const followModel = require('../models/follow.js');
 const tokenModel = require('../models/token.js');
-const {getToken} = require('../utils/token')
+const { getToken } = require('../utils/token');
 const sha = require('sha.js');
 const axios = require('axios').default;
 
@@ -93,8 +93,8 @@ class projectController extends baseController {
         '*id': id
       },
       get: {
-        'id': id,
-        'project_id': id
+        id: id,
+        project_id: id
       },
       list: {
         '*group_id': group_id
@@ -347,6 +347,35 @@ class projectController extends baseController {
           }
         }
       }
+
+      // 增加member
+      let copyProject = await this.Model.get(copyId);
+      let copyProjectMembers = copyProject.members;
+
+      let uid = this.getUid();
+      // 将项目添加者变成项目组长,除admin以外
+      if (this.getRole() !== 'admin') {
+        let userdata = await yapi.commons.getUserdata(uid, 'owner');
+        let check = await this.Model.checkMemberRepeat(copyId, uid);
+        if (check === 0) {
+          copyProjectMembers.push(userdata);
+        }
+      }
+      await this.Model.addMember(result._id, copyProjectMembers);
+
+      // 在每个测试结合下添加interface
+
+      let username = this.getUsername();
+      yapi.commons.saveLog({
+        content: `<a href="/user/profile/${this.getUid()}">${username}</a> 复制了项目 ${
+          params.preName
+        } 为 <a href="/project/${result._id}">${params.name}</a>`,
+        type: 'project',
+        uid,
+        username: username,
+        typeid: result._id
+      });
+
       ctx.body = yapi.commons.resReturn(result);
     } catch (err) {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);
@@ -490,7 +519,7 @@ class projectController extends baseController {
 
   async get(ctx) {
     let params = ctx.params;
-    let projectId= params.id || params.project_id; // 通过 token 访问
+    let projectId = params.id || params.project_id; // 通过 token 访问
     let result = await this.Model.getBaseInfo(projectId);
 
     if (!result) {
@@ -562,7 +591,7 @@ class projectController extends baseController {
     } else {
       follow = follow.map(item => {
         item = item.toObject();
-        item._id = item.projectid
+        item._id = item.projectid;
         item.follow = true;
         return item;
       });
@@ -976,17 +1005,14 @@ class projectController extends baseController {
       let token;
       if (!data) {
         let passsalt = yapi.commons.randStr();
-        token = sha('sha1')
-          .update(passsalt)
-          .digest('hex')
-          .substr(0, 20);
+        token = sha('sha1').update(passsalt).digest('hex').substr(0, 20);
 
         await this.tokenModel.save({ project_id, token });
       } else {
         token = data.token;
       }
 
-      token = getToken(token, this.getUid())
+      token = getToken(token, this.getUid());
 
       ctx.body = yapi.commons.resReturn(token);
     } catch (err) {
@@ -1011,10 +1037,7 @@ class projectController extends baseController {
       let token, result;
       if (data && data.token) {
         let passsalt = yapi.commons.randStr();
-        token = sha('sha1')
-          .update(passsalt)
-          .digest('hex')
-          .substr(0, 20);
+        token = sha('sha1').update(passsalt).digest('hex').substr(0, 20);
         result = await this.tokenModel.up(project_id, token);
         token = getToken(token);
         result.token = token;

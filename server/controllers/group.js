@@ -226,6 +226,22 @@ class groupController extends baseController {
         up_time: yapi.commons.time(),
         members: groupInfo.owners
       });
+
+      // 拷贝空间成员
+      let group = await groupInst.get(copyId);
+      let copyGroupMembers = group.members;
+      let uid = this.getUid();
+
+      // 将空间复制者变成组长,除 admin 以外
+      if (this.getRole() !== 'admin') {
+        let userdata = await yapi.commons.getUserdata(uid, 'owner');
+        let check = await groupInst.checkMemberRepeat(copyId, uid);
+        if (check === 0) {
+          copyGroupMembers.push(userdata);
+        }
+      }
+      await groupInst.addMember(newGroupInfo._id, copyGroupMembers);
+
       //  获取 group 下的所有项目，然后全部复制
       let projectInst = yapi.getInst(projectModel);
       if (newGroupInfo._id) {
@@ -235,7 +251,7 @@ class groupController extends baseController {
           const currProjectInfo = projectList[i];
           const data = Object.assign(currProjectInfo.toObject(), {
             group_id: newGroupInfo._id,
-            uid: this.getUid(),
+            uid,
             add_time: yapi.commons.time(),
             up_time: yapi.commons.time()
           });
@@ -251,7 +267,7 @@ class groupController extends baseController {
             name: '公共测试集',
             project_id: newProjectId,
             desc: '公共测试集',
-            uid: this.getUid(),
+            uid,
             add_time: yapi.commons.time(),
             up_time: yapi.commons.time()
           });
@@ -264,7 +280,7 @@ class groupController extends baseController {
               name: item.name,
               project_id: newProjectId,
               desc: item.desc,
-              uid: this.getUid(),
+              uid,
               add_time: yapi.commons.time(),
               up_time: yapi.commons.time()
             };
@@ -277,7 +293,7 @@ class groupController extends baseController {
             for (let key = 0; key < interfaceData.length; key++) {
               let interfaceItem = interfaceData[key].toObject();
               let data = Object.assign(interfaceItem, {
-                uid: this.getUid(),
+                uid,
                 catid: catResult._id,
                 project_id: newProjectId,
                 add_time: yapi.commons.time(),
@@ -287,7 +303,30 @@ class groupController extends baseController {
               await interfaceInst.save(data);
             }
           }
+          // 增加member
+          let copyProject = await projectInst.get(oldProjectId);
+          let copyProjectMembers = copyProject.members;
+
+          // 将项目添加者变成项目组长,除admin以外
+          if (this.getRole() !== 'admin') {
+            let userdata = await yapi.commons.getUserdata(uid, 'owner');
+            let check = await projectInst.checkMemberRepeat(oldProjectId, uid);
+            if (check === 0) {
+              copyProjectMembers.push(userdata);
+            }
+          }
+          await projectInst.addMember(copyProjectInfo._id, copyProjectMembers);
         }
+
+        // 在每个测试结合下添加interface
+        let username = this.getUsername();
+        yapi.commons.saveLog({
+          content: `<a href="/user/profile/${uid}">${username}</a> 新增了分组 <a href="/group/${newGroupInfo._id}">${newGroupInfo.group_name}</a>`,
+          type: 'group',
+          uid,
+          username: username,
+          typeid: newGroupInfo._id
+        });
 
         ctx.body = yapi.commons.resReturn(newGroupInfo);
       }
