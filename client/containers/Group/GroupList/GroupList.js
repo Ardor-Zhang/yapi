@@ -1,7 +1,7 @@
 import React, { PureComponent as Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
-import { Icon, Modal, Input, message,Spin,  Row, Menu, Col, Popover, Tooltip } from 'antd';
+import { Icon, Modal, Input, message, Spin, Row, Menu, Col, Popover, Tooltip, Alert } from 'antd';
 import { autobind } from 'core-decorators';
 import axios from 'axios';
 import { withRouter } from 'react-router-dom';
@@ -10,6 +10,7 @@ const Search = Input.Search;
 import UsernameAutoComplete from '../../../components/UsernameAutoComplete/UsernameAutoComplete.js';
 import GuideBtns from '../../../components/GuideBtns/GuideBtns.js';
 import { fetchNewsData } from '../../../reducer/modules/news.js';
+import { trim } from '../../../common.js';
 import {
   fetchGroupList,
   setCurrGroup,
@@ -20,9 +21,11 @@ import _ from 'underscore';
 
 import './GroupList.scss';
 
+const confirm = Modal.confirm;
+
 const tip = (
-  <div className="title-container">
-    <h3 className="title">欢迎使用 YApi ~</h3>
+  <div className='title-container'>
+    <h3 className='title'>欢迎使用 YApi ~</h3>
     <p>
       这里的 <b>“个人空间”</b>{' '}
       是你自己才能看到的分组，你拥有这个分组的全部权限，可以在这个分组里探索 YApi 的功能。
@@ -198,6 +201,43 @@ export default class GroupList extends Component {
     }
   }
 
+  // 复制空间的二次确认
+  showConfirm = () => {
+    const that = this;
+    confirm({
+      title: '确认复制 ' + that.props.currGroup.group_name + ' 分组吗？',
+      okText: '确认',
+      cancelText: '取消',
+      content: (
+        <div style={{ marginTop: '10px', fontSize: '13px', lineHeight: '25px' }}>
+          <Alert
+            message={`该操作将会复制 ${that.props.currGroup.group_name} 下的所有项目和接口集合，但不包括测试集合中的接口`}
+            type='info'
+          />
+          <div style={{ marginTop: '16px' }}>
+            <p>
+              <b>分组名称:</b>
+            </p>
+            <Input id='copy_group_name' placeholder='分组名称' />
+          </div>
+        </div>
+      ),
+      async onOk() {
+        const groupName = trim(document.getElementById('copy_group_name').value);
+        const group_id = that.props.currGroup._id;
+        const res = await axios.post('/api/group/copy', { group_name: groupName, group_id });
+        if (!res.data.errcode) {
+          await that.props.fetchGroupList();
+          message.success('空间复制成功');
+        } else {
+          message.error(res.data.errmsg);
+        }
+      },
+      iconType: 'copy',
+      onCancel() {}
+    });
+  };
+
   componentWillReceiveProps(nextProps) {
     // GroupSetting 组件设置的分组信息，通过redux同步到左侧分组菜单中
     if (this.props.groupList !== nextProps.groupList) {
@@ -210,39 +250,42 @@ export default class GroupList extends Component {
   render() {
     const { currGroup } = this.props;
     return (
-      <div className="m-group">
-        {!this.props.study ? <div className="study-mask" /> : null}
-        <div className="group-bar">
-          <div className="curr-group">
-            <div className="curr-group-name">
-              <span className="name">{currGroup.group_name}</span>
-              <Tooltip title="添加分组">
-                <a className="editSet">
-                  <Icon className="btn" type="folder-add" onClick={this.showModal} />
+      <div className='m-group'>
+        {!this.props.study ? <div className='study-mask' /> : null}
+        <div className='group-bar'>
+          <div className='curr-group'>
+            <div className='curr-group-name'>
+              <span className='name'>{currGroup.group_name}</span>
+              <Tooltip title='添加分组'>
+                <a className='editSet'>
+                  <Icon className='btn' type='folder-add' onClick={this.showModal} />
                 </a>
               </Tooltip>
-            
             </div>
-            <div className="curr-group-desc">简介: {currGroup.group_desc}</div>
+            <div className='curr-group-desc'>简介: {currGroup.group_desc}</div>
           </div>
 
-          <div className="group-operate">
-            <div className="search">
+          <div className='group-operate'>
+            <div className='search'>
               <Search
-                placeholder="搜索分类"
+                placeholder='搜索分类'
                 onChange={this.searchGroup}
                 onSearch={v => this.searchGroup(null, v)}
               />
             </div>
           </div>
-          {this.state.groupList.length === 0 && <Spin style={{
-            marginTop: 20,
-            display: 'flex',
-            justifyContent: 'center'
-          }} />}
+          {this.state.groupList.length === 0 && (
+            <Spin
+              style={{
+                marginTop: 20,
+                display: 'flex',
+                justifyContent: 'center'
+              }}
+            />
+          )}
           <Menu
-            className="group-list"
-            mode="inline"
+            className='group-list'
+            mode='inline'
             onClick={this.selectGroup}
             selectedKeys={[`${currGroup._id}`]}
           >
@@ -251,15 +294,15 @@ export default class GroupList extends Component {
                 return (
                   <Menu.Item
                     key={`${group._id}`}
-                    className="group-item"
+                    className='group-item'
                     style={{ zIndex: this.props.studyTip === 0 ? 3 : 1 }}
                   >
-                    <Icon type="user" />
+                    <Icon type='user' />
                     <Popover
-                      overlayClassName="popover-index"
+                      overlayClassName='popover-index'
                       content={<GuideBtns />}
                       title={tip}
-                      placement="right"
+                      placement='right'
                       visible={this.props.studyTip === 0 && !this.props.study}
                     >
                       {group.group_name}
@@ -268,9 +311,19 @@ export default class GroupList extends Component {
                 );
               } else {
                 return (
-                  <Menu.Item key={`${group._id}`} className="group-item">
-                    <Icon type="folder-open" />
-                    {group.group_name}
+                  <Menu.Item key={`${group._id}`} className='group-item'>
+                    <div className='name'>
+                      <Icon type='folder-open' />
+                      {group.group_name}
+                    </div>
+
+                    {currGroup._id === group._id && (
+                      <div className='copy-btns' onClick={this.showConfirm}>
+                        <Tooltip placement='rightTop' title='复制分组'>
+                          <Icon type='copy' className='icon' />
+                        </Tooltip>
+                      </div>
+                    )}
                   </Menu.Item>
                 );
               }
@@ -279,33 +332,33 @@ export default class GroupList extends Component {
         </div>
         {this.state.addGroupModalVisible ? (
           <Modal
-            title="添加分组"
+            title='添加分组'
             visible={this.state.addGroupModalVisible}
             onOk={this.addGroup}
             onCancel={this.hideModal}
-            className="add-group-modal"
+            className='add-group-modal'
           >
-            <Row gutter={6} className="modal-input">
-              <Col span="5">
-                <div className="label">分组名：</div>
+            <Row gutter={6} className='modal-input'>
+              <Col span='5'>
+                <div className='label'>分组名：</div>
               </Col>
-              <Col span="15">
-                <Input placeholder="请输入分组名称" onChange={this.inputNewGroupName} />
-              </Col>
-            </Row>
-            <Row gutter={6} className="modal-input">
-              <Col span="5">
-                <div className="label">简介：</div>
-              </Col>
-              <Col span="15">
-                <TextArea rows={3} placeholder="请输入分组描述" onChange={this.inputNewGroupDesc} />
+              <Col span='15'>
+                <Input placeholder='请输入分组名称' onChange={this.inputNewGroupName} />
               </Col>
             </Row>
-            <Row gutter={6} className="modal-input">
-              <Col span="5">
-                <div className="label">组长：</div>
+            <Row gutter={6} className='modal-input'>
+              <Col span='5'>
+                <div className='label'>简介：</div>
               </Col>
-              <Col span="15">
+              <Col span='15'>
+                <TextArea rows={3} placeholder='请输入分组描述' onChange={this.inputNewGroupDesc} />
+              </Col>
+            </Row>
+            <Row gutter={6} className='modal-input'>
+              <Col span='5'>
+                <div className='label'>组长：</div>
+              </Col>
+              <Col span='15'>
                 <UsernameAutoComplete callbackState={this.onUserSelect} />
               </Col>
             </Row>

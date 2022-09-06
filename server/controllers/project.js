@@ -347,34 +347,6 @@ class projectController extends baseController {
           }
         }
       }
-
-      // 增加member
-      let copyProject = await this.Model.get(copyId);
-      let copyProjectMembers = copyProject.members;
-
-      let uid = this.getUid();
-      // 将项目添加者变成项目组长,除admin以外
-      if (this.getRole() !== 'admin') {
-        let userdata = await yapi.commons.getUserdata(uid, 'owner');
-        let check = await this.Model.checkMemberRepeat(copyId, uid);
-        if (check === 0) {
-          copyProjectMembers.push(userdata);
-        }
-      }
-      await this.Model.addMember(result._id, copyProjectMembers);
-
-      // 在每个测试结合下添加interface
-
-      let username = this.getUsername();
-      yapi.commons.saveLog({
-        content: `<a href="/user/profile/${this.getUid()}">${username}</a> 复制了项目 ${
-          params.preName
-        } 为 <a href="/project/${result._id}">${params.name}</a>`,
-        type: 'project',
-        uid,
-        username: username,
-        typeid: result._id
-      });
       ctx.body = yapi.commons.resReturn(result);
     } catch (err) {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);

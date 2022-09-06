@@ -198,20 +198,27 @@ class groupController extends baseController {
       let params = ctx.params;
 
       // 拷贝空间的ID
-      let copyId = params._id;
+      let copyId = params.group_id;
+      // 查看是否有权限
       if ((await this.checkAuth(params.group_id, 'group', 'edit')) !== true) {
         return (ctx.body = yapi.commons.resReturn(null, 405, '没有权限'));
       }
-
+      // 查看分组名是否存在
       let groupInst = yapi.getInst(groupModel);
       let groupInfo = groupInst.getGroupById(copyId);
-      const copyProjectName = groupInfo.group_name + Date.now();
+      const copyProjectName = params.group_name;
+
+      if (!copyProjectName) {
+        return (ctx.body = yapi.commons.resReturn(null, 401, '分组名不能为空'));
+      }
+
       let checkRepeat = await groupInst.checkRepeat(copyProjectName);
       if (checkRepeat > 0) {
         return (ctx.body = yapi.commons.resReturn(null, 401, '项目分组名已存在'));
       }
+
       // 新增空间
-      let newGroupInfo = groupInst.save({
+      let newGroupInfo = await groupInst.save({
         group_name: copyProjectName,
         group_desc: groupInfo.group_desc,
         uid: this.getUid(),
@@ -219,68 +226,98 @@ class groupController extends baseController {
         up_time: yapi.commons.time(),
         members: groupInfo.owners
       });
-
       //  获取 group 下的所有项目，然后全部复制
+      let projectInst = yapi.getInst(projectModel);
       if (newGroupInfo._id) {
         // 拷贝项目列表
-        let projectList = await yapi.getInst(projectModel).list(copyId);
+        let projectList = await projectInst.list(copyId);
         for (let i = 0; i < projectList.length; i++) {
-          let data = Object.assign(projectList[i], {
+          const currProjectInfo = projectList[i];
+          const data = Object.assign(currProjectInfo.toObject(), {
+            group_id: newGroupInfo._id,
             uid: this.getUid(),
             add_time: yapi.commons.time(),
             up_time: yapi.commons.time()
           });
           delete data._id;
-          let copyProjectInfo = await yapi.getInst(projectModel).save(data);
+          let copyProjectInfo = await projectInst.save(data);
           let colInst = yapi.getInst(interfaceColModel);
+          let interfaceInst = yapi.getInst(interfaceModel);
           let catInst = yapi.getInst(interfaceCatModel);
-          let interfaceModel = yapi.getInst(interfaceModel);
 
-          // 增加集合
-          if (copyProjectInfo._id) {
-            await colInst.save({
-              name: '公共测试集',
-              project_id: copyProjectInfo._id,
-              desc: '公共测试集',
+          const oldProjectId = currProjectInfo._id;
+          let newProjectId = copyProjectInfo._id;
+          await colInst.save({
+            name: '公共测试集',
+            project_id: newProjectId,
+            desc: '公共测试集',
+            uid: this.getUid(),
+            add_time: yapi.commons.time(),
+            up_time: yapi.commons.time()
+          });
+
+          // 拷贝接口列表
+          let cat = await catInst.list(oldProjectId);
+          for (let j = 0; j < cat.length; j++) {
+            let item = cat[j];
+            let catDate = {
+              name: item.name,
+              project_id: newProjectId,
+              desc: item.desc,
               uid: this.getUid(),
               add_time: yapi.commons.time(),
               up_time: yapi.commons.time()
-            });
+            };
+            let catResult = await catInst.save(catDate);
 
-            // 拷贝接口列表
-            let cat = params.cat;
-            for (let j = 0; j < cat.length; j++) {
-              let item = cat[j];
-              let catDate = {
-                name: item.name,
-                project_id: copyProjectInfo._id,
-                desc: item.desc,
+            // 获取每个集合中的interface
+            let interfaceData = await interfaceInst.listByInterStatus(item._id);
+
+            // 将interfaceData存到新的catID中
+            for (let key = 0; key < interfaceData.length; key++) {
+              let interfaceItem = interfaceData[key].toObject();
+              let data = Object.assign(interfaceItem, {
                 uid: this.getUid(),
+                catid: catResult._id,
+                project_id: newProjectId,
                 add_time: yapi.commons.time(),
                 up_time: yapi.commons.time()
-              };
-              let catResult = await catInst.save(catDate);
-
-              // 获取每个集合中的interface
-              let interfaceData = await interfaceModel.listByInterStatus(item._id);
-
-              // 将interfaceData存到新的catID中
-              for (let key = 0; key < interfaceData.length; key++) {
-                let interfaceItem = interfaceData[key].toObject();
-                let data = Object.assign(interfaceItem, {
-                  uid: this.getUid(),
-                  catid: catResult._id,
-                  project_id: copyProjectInfo._id,
-                  add_time: yapi.commons.time(),
-                  up_time: yapi.commons.time()
-                });
-                delete data._id;
-
-                await interfaceModel.save(data);
-              }
+              });
+              delete data._id;
+              await interfaceInst.save(data);
             }
           }
         }
+
+        // 增加member
+        let copyProject = await this.Model.get(copyId);
+        let copyProjectMembers = copyProject.members;
+
+        let uid = this.getUid();
+        // 将项目添加者变成项目组长,除admin以外
+        if (this.getRole() !== 'admin') {
+          let userdata = await yapi.commons.getUserdata(uid, 'owner');
+          let check = await this.Model.checkMemberRepeat(copyId, uid);
+          if (check === 0) {
+            copyProjectMembers.push(userdata);
+          }
+        }
+        await this.Model.addMember(result._id, copyProjectMembers);
+
+        // 在每个测试结合下添加interface
+
+        let username = this.getUsername();
+        yapi.commons.saveLog({
+          content: `<a href="/user/profile/${this.getUid()}">${username}</a> 复制了项目 ${
+            params.preName
+          } 为 <a href="/project/${result._id}">${params.name}</a>`,
+          type: 'project',
+          uid,
+          username: username,
+          typeid: result._id
+        });
+
+        ctx.body = yapi.commons.resReturn(newGroupInfo);
       }
     } catch (err) {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);
